@@ -1,0 +1,8 @@
+# Sanity config: random agent on CartPole proves the framework is generic.
+name: cartpole-random
+seed: 7
+env: gym:CartPole-v1
+agent: random
+episodes: 20
+max_steps: 200
+loggers: [console]

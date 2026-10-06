@@ -1,0 +1,14 @@
+[project]
+name = "rl-lab"
+version = "0.1.0"
+description = "Modular OOP benchmark lab for RL experiments (semiconductor process hook)"
+requires-python = ">=3.11"
+dependencies = ["pyyaml", "numpy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# -p no:libtmux / -p no:anyio: these third-party pytest plugins ship marks
+# applied to fixtures, which pytest 9 rejects during plugin loading -- the
+# whole session crashes before a single test runs. Blacklisting them in
+# addopts keeps `pytest` working out of the box on shared machines.
+addopts = "-q -p no:libtmux -p no:anyio"

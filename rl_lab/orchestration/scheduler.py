@@ -64,14 +64,20 @@ class JobScheduler:
         # bug wedged every pre-start submission (DEBUGGING.md #7). Making
         # "submit implies pool alive" an invariant removes the footgun
         # entirely; explicit start() stays legal and idempotent.
+        # _start_lock guards lazy start against a submit/enter race: two
+        # producers must never both see _started == False.
         self._started = False
-        # Join-on-exit safety net (DEBUGGING.md #7, second layer): tests and
-        # ad-hoc scripts that never call stop()/close() would otherwise leak
-        # non-daemon workers parked in get(), and the interpreter hangs in
-        # threading._shutdown at exit -- pytest prints "13 passed" then
-        # never returns. The atexit hook drains sentinels exactly once per
-        # live pool. Production paths still use `with sched:` for *prompt*
-        # shutdown; this only guarantees we can always LEAVE.
+        self._start_lock = threading.Lock()
+        # DEBUGGING.md #7, second layer (REWORKED): earlier we promised an
+        # atexit drain, but it was never actually wired up -- leaked pools
+        # still wedged the interpreter in threading._shutdown at exit.
+        # Workers are now DAEMON threads: they can never block process
+        # exit. We keep join() as our normal completion proof (`with
+        # sched:` / wait-after-close); daemon-ness is only the last-resort
+        # guarantee that a forgotten close() costs a silent exit instead of
+        # a hung CI job. Tradeoff documented: daemons die mid-job if the
+        # main thread exits without closing -- acceptable for sweeps whose
+        # results only matter to the still-alive parent.
         self._threads: list[threading.Thread] = []
         # join()-based wait() needs to know the pool was closed, otherwise
         # workers blocked on an empty queue never exit and "all done" is
@@ -115,15 +121,21 @@ class JobScheduler:
 
     def start(self) -> None:
         """Spawn the worker pool. Idempotent -- safe to call explicitly or
-        rely on submit()'s lazy start (both paths end up here once)."""
-        with self._lock:
-            if self._started or self._closed:
+        rely on submit()'s lazy start (both paths end up here once).
+
+        Double-checked locking: fast path reads _started without a lock;
+        the check-and-set happens atomically under _start_lock so two
+        concurrent producers can never each spawn a full pool."""
+        if self._started or self._closed:      # fast path, no lock needed
+            return
+        with self._start_lock:
+            if self._started or self._closed:  # re-check: another thread won
                 return
             self._started = True
             for i in range(self.num_workers):
                 t = threading.Thread(target=self._worker_loop,
                                      name=f"rl-worker-{i}",
-                                     daemon=False)  # non-daemon: join() proves done
+                                     daemon=True)  # DEBUGGING.md #7: leaked pools must never block interpreter exit
                 t.start()
                 self._threads.append(t)
 

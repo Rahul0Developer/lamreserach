@@ -82,3 +82,43 @@ def test_save_writes_valid_json(tmp_path):
     data = json.loads(path.read_text())
     assert data["q_table"]["0|1"][0] > 0.0  # updated from 0.0 init
     assert data["alpha"] == a.alpha
+
+
+def test_load_roundtrip_restores_behaviour(tmp_path):
+    """save() -> load() must reproduce identical greedy actions (checkpoint
+    correctness, not just valid JSON)."""
+    a = QLearningAgent(n_actions=3, seed=1)
+    for s in [(0, 0), (1, 2), (2, 1)]:
+        a.q_table[s] = [float(s[0]), float(s[1]), 0.5]
+    path = tmp_path / "ckpt.json"
+    a.save(str(path))
+    b = QLearningAgent.load(str(path), seed=1)
+    assert b.n_actions == 3
+    # tuple keys must round-trip back to tuples, not stay as "a|b" strings
+    assert set(b.q_table) == set(a.q_table)
+    for s in a.q_table:
+        assert b.best_action(s) == a.best_action(s)
+
+
+def test_load_rejects_missing_fields(tmp_path):
+    import json
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps({"alpha": 0.2}))   # no q_table/gamma
+    with pytest.raises(ValueError, match="missing required field"):
+        QLearningAgent.load(str(path))
+
+
+def test_load_rejects_ragged_table(tmp_path):
+    import json
+    path = tmp_path / "ragged.json"
+    path.write_text(json.dumps({"alpha": 0.2, "gamma": 0.9,
+                                "q_table": {"a|b": [0.1, 0.2], "c|d": [0.3]}}))
+    with pytest.raises(ValueError, match="ragged"):
+        QLearningAgent.load(str(path))
+
+
+def test_load_rejects_non_json(tmp_path):
+    path = tmp_path / "junk.json"
+    path.write_text("not json at all")
+    with pytest.raises(ValueError, match="not readable JSON"):
+        QLearningAgent.load(str(path))

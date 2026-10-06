@@ -17,6 +17,7 @@ actually seen?" debuggable with a single len() call.
 from __future__ import annotations
 
 import random
+from pathlib import Path
 from typing import Any
 
 from rl_lab.core.base import BaseAgent, StepResult
@@ -89,5 +90,44 @@ class QLearningAgent(BaseAgent):
             json.dump({"alpha": self.alpha, "gamma": self.gamma,
                        "q_table": serialisable}, fh)
 
-    # TODO(phase6): load() with schema check -- a stale table from an old
-    # bin layout silently corrupts learning; validate n_actions on load.
+    @classmethod
+    def load(cls, path: str, seed: int | None = None) -> "QLearningAgent":
+        """Restore a checkpoint saved by save().
+
+        Schema-checked on purpose: a table trained with a different action
+        count or state-bucketing would otherwise load "successfully" and
+        silently corrupt learning -- the worst kind of bug to chase in a
+        long run. Fail loudly at load time instead.
+        """
+        import json
+        try:
+            data = json.loads(Path(path).read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"checkpoint {path} is not readable JSON: {exc}") from exc
+        for key in ("alpha", "gamma", "q_table"):
+            if key not in data:
+                raise ValueError(
+                    f"checkpoint {path} missing required field '{key}'")
+        q_table = data["q_table"]
+        if not isinstance(q_table, dict):
+            raise ValueError(f"checkpoint {path}: q_table must be a mapping")
+        rows = set(len(v) for v in q_table.values() if isinstance(v, list))
+        if len(rows) > 1:
+            raise ValueError(
+                f"checkpoint {path}: ragged Q-table (row widths {sorted(rows)})"
+                " -- likely written by an incompatible build")
+        n_actions = rows.pop() if rows else 0
+        agent = cls(n_actions=n_actions, learning_rate=data["alpha"],
+                   discount=data["gamma"], seed=seed)
+        # save() stringifies tuple keys as "a|b" (JSON has no tuples); restore
+        # them so loaded states match the env's native tuple observations.
+        # Components are int-cast where possible because EtchChamberEnv hands
+        # us integer bucket tuples -- ("0","1") would never match (0,1).
+        def _restore_key(k: str):
+            parts = k.split("|")
+            if len(parts) == 1:
+                return k
+            return tuple(int(p) if p.lstrip("-").isdigit() else p
+                         for p in parts)
+        agent.q_table = {_restore_key(k): list(v) for k, v in q_table.items()}
+        return agent

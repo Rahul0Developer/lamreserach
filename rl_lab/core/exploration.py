@@ -29,7 +29,8 @@ class EpsilonGreedy(ExplorationPolicy):
     Linear decay from epsilon_start to epsilon_end over decay_episodes:
     simple, predictable, and debuggable -- you can compute the exact epsilon
     at any episode when a run behaves strangely. (Exponential decay is the
-    common alternative; TODO: expose schedule as config if we need it.)
+    common alternative; keeping one schedule explicit beats a config matrix
+    nobody has validated yet.)
     """
 
     def __init__(self, epsilon_start: float = 1.0, epsilon_end: float = 0.05,

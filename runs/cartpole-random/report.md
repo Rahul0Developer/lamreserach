@@ -7,18 +7,18 @@
 | env | `gym:CartPole-v1` |
 | agent | `random` |
 | seed | 7 |
-| episodes | 5 |
+| episodes | 10 |
 | max_steps | 200 |
-| eval_episodes | 3 |
+| eval_episodes | 20 |
 
 ## Result
 
-- final state: **DONE**
-- wall time: 0.2s
-- eval mean reward: **18.00** (std 6.16)
-- eval min/max: 10.00 / 25.00
+- final state: **IDLE**
+- wall time: 0.0s
+- eval mean reward: **22.05** (std 9.18)
+- eval min/max: 10.00 / 44.00
 - success rate: 100%
-- training reward 16.0 -> 13.0 (flat/declined)
+- training reward 16.0 -> 29.0 (improved)
 
 ## Learning curve
 

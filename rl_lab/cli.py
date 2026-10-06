@@ -1,12 +1,12 @@
 """rl-lab command line entry point.
 
-Why argparse over click/typer: zero dependencies, and the subcommand
-structure (run/list/validate) is all we need. If this ever grows past a
-handful of commands I'd revisit -- TODO(phase5): add `sweep` for parallel
-seed runs once the multithreaded runner lands.
+Why argparse over click/typer: zero dependencies, and the subcommand set
+(run / sweep / validate / list) is all we need. If this ever grows past a
+handful of commands I'd revisit.
 
 Exit codes matter in CI and for equipment automation (our SEMI EAP
-analogs parse them): 0 ok, 1 experiment FAILED, 2 bad config/usage.
+analogs parse them): 0 ok, 1 experiment FAILED, 2 bad config/usage,
+130 interrupted sweep.
 """
 from __future__ import annotations
 

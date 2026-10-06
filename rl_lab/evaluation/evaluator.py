@@ -42,7 +42,9 @@ class Evaluator:
         self.max_steps = max_steps
         # Default threshold: any episode scoring above half the theoretical
         # worst case counts as "acceptable process". Env-specific overrides
-        # belong in config, not here. TODO(phase7): pull from YAML.
+        # belong in config -- the controller passes cfg.success_threshold
+        # through here (schema.py), so this constructor default is only the
+        # fallback for direct/programmatic use.
         self.success_threshold = success_threshold
 
     def evaluate(self, agent: BaseAgent, episodes: int = 20,

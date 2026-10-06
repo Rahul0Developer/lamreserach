@@ -4,7 +4,7 @@ Why threads and not processes (for now): our workload is tabular Q-learning
 inside Python loops plus file IO -- and the heavy inner step actually calls
 numpy/pandas C code that releases the GIL, so real work overlaps. The
 backend is deliberately hidden behind submit()/run_all() so swapping in
-ProcessPoolExecutor later is a one-file change (see TODO below). If we ever
+ProcessPoolExecutor later is a one-file change. If we ever
 add DQN-torch sweeps, processes become mandatory: torch spawns its own
 intra-op threads and N python processes x M torch threads = thrashing.
 

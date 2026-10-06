@@ -10,8 +10,8 @@ the in-memory result objects; serialization is one-way.
 Design choices:
   - matplotlib with explicit Agg backend, created lazily inside methods.
     Import cost only paid when someone actually asks for a plot, and CI
-    without a display still works. TODO: if plotting becomes optional at
-    install time, guard with try/import and emit tables-only reports.
+    without a display still works. If plotting ever becomes an optional
+    install extra, guard with try/import and emit tables-only reports.
   - Rolling-mean smoothing instead of raw per-episode curves: raw reward
     is spiky noise that hides learning trends; window defaults to ~5% of
     episodes (min 1). We plot BOTH faintly so nobody has to trust the

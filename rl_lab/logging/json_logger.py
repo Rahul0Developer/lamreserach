@@ -6,8 +6,10 @@ episodes in memory (fine for <= tens of thousands of rows) and write once
 on train end -- plus a best-effort write on close so interrupted runs still
 produce something readable.
 
-TODO(phase5): with the multithreaded runner many jobs share runs/; make the
-filename include job id + seed so results never overwrite each other.
+JSONLogger writes a per-run summary.json (one JSON document per run, in
+its own runs/<name>/ dir -- no cross-job overwrites; the old phase-5 worry
+about shared filenames is resolved by the per-seed output dirs). A true
+JSONL streaming logger is on the to-do list for when runs outlive processes.
 """
 from __future__ import annotations
 

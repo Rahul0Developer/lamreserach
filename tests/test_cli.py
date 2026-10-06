@@ -122,3 +122,49 @@ def test_module_invocation_works(tmp_path):
                            str(cfg)], capture_output=True, text=True,
                           cwd="/workspace", timeout=60)
     assert proc.returncode == 0 and "OK" in proc.stdout
+
+
+def test_run_reports_failed_experiment_exit_one(tmp_path, capsys):
+    """A crashing env must exit 1 with the error printed -- FAILED runs are
+    exactly what CI needs to catch (regression for DEBUGGING.md #3)."""
+    cfg = write_cfg(tmp_path)
+    # Sabotage through the factory seam: an env spec that constructs fine
+    # but blows up at reset time is simulated by monkeypatching the registry.
+    from rl_lab import factory
+
+    class BoomEnv:
+        action_space_size = 1   # what the factory/trainer actually reads
+
+        def reset(self, seed=None):
+            raise RuntimeError("chamber interlock")
+
+        def step(self, a):
+            raise RuntimeError("unreachable")
+
+    orig = factory._ENV_REGISTRY["etch_chamber"]
+    factory._ENV_REGISTRY["etch_chamber"] = lambda **kw: BoomEnv()
+    try:
+        rc = main(["run", str(cfg)])
+    finally:
+        factory._ENV_REGISTRY["etch_chamber"] = orig
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert "interlock" in err
+
+
+def test_sweep_with_report_writes_files(tmp_path, capsys):
+    """End-to-end sweep + report path exercised through main(), not just
+    unit-level scheduler calls."""
+    raw = {"name": "cli-sweep", "env": "etch_chamber", "agent": "random",
+           "episodes": 2, "max_steps": 10, "eval_episodes": 2,
+           "loggers": ["csv"], "output_dir": str(tmp_path / "runs")}
+    import yaml
+    p = tmp_path / "cfg.yaml"
+    p.write_text(yaml.safe_dump(raw))
+    out_md = tmp_path / "sweep_report.md"
+    rc = main(["sweep", str(p), "--seeds", "0", "1", "--workers", "2",
+               "--report", str(out_md)])
+    assert rc == 0
+    text = out_md.read_text()
+    assert "cli-sweep_seed0" in text and "cli-sweep_seed1" in text
+    assert "Aggregate" in text or "aggregate" in text.lower()

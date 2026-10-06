@@ -1,0 +1,16 @@
+# Etch chamber control with tabular Q-Learning.
+name: etch-qlearning-v1
+seed: 42
+env: etch_chamber
+agent: qlearning
+episodes: 300
+max_steps: 100
+learning_rate: 0.2
+discount: 0.95
+epsilon_start: 1.0
+epsilon_end: 0.05
+epsilon_decay_episodes: 150
+loggers: [console, csv]
+output_dir: runs
+extra:
+  target_etch_rate: 50.0   # angstrom/min

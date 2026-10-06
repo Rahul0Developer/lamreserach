@@ -192,8 +192,10 @@ class ExperimentController:
             self._agent, episodes=cfg.eval_episodes, seed=cfg.seed + 1)
 
     def _enter_reporting(self, _old: State, _new: State) -> None:
-        # Phase 6 replaces this stub with ReportGenerator (plots + tables).
-        # Kept as a real phase now so the FSM graph is exercised end-to-end.
-        # TODO(phase6): write markdown report with reward curve into
-        # self.output_dir/report.md
-        pass
+        # Phase 6: real report generation. Deferred import so core/reporting
+        # never hard-depends on matplotlib (headless CI without plotting can
+        # still run train+eval; the ImportError is honest and local).
+        from rl_lab.reporting.report_generator import ReportGenerator
+        gen = ReportGenerator()
+        self._report_path = gen.write_run_report(
+            self.result, self.output_dir / "report.md")

@@ -36,6 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
     run_p.add_argument("-o", "--set", dest="overrides", action="append",
                        default=[], metavar="KEY=VALUE",
                        help="override a config key, e.g. -o episodes=50")
+    # Phase 6: report path. "auto" (bare --report) keeps the file in the
+    # run dir; any other value is treated as an output path.
+    run_p.add_argument("--report", nargs="?", const="auto", default=None,
+                       metavar="PATH",
+                       help="write markdown report + learning curve "
+                            "(default: runs/<name>/report.md)")
 
     sub.add_parser("list", help="show registered envs and agents")
 
@@ -50,6 +56,11 @@ def build_parser() -> argparse.ArgumentParser:
                       metavar="K", help="seed list (default: 0 1 2)")
     sw_p.add_argument("--workers", type=int, default=0,
                       help="worker threads; 0 = auto (default)")
+    # Phase 6: sweep report. Same "auto" convention as run --report.
+    sw_p.add_argument("--report", nargs="?", const="auto", default=None,
+                      metavar="PATH",
+                      help="write sweep report with comparison table and "
+                           "overlaid curves (default: runs/sweep_report.md)")
     return parser
 
 
@@ -72,6 +83,10 @@ def _parse_overrides(pairs: list[str]) -> dict:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    if getattr(args, "report", False):
+        # Import here, not at module top: `rl-lab run` must work on machines
+        # without matplotlib (headless CI); only --report pays that import.
+        from rl_lab.reporting.report_generator import ReportGenerator
     cfg = load_config(args.config)   # validates file-level errors first
     if args.overrides:
         # Rebuild through the same validator instead of poking attributes:
@@ -117,6 +132,15 @@ def cmd_run(args: argparse.Namespace) -> int:
               f"success={er.success_rate:.0%} over {er.episodes} episodes")
     if result.output_dir:
         print(f"  artifacts: {result.output_dir}/")
+    if getattr(args, "report", False):
+        # --report regenerates report.md at a user-chosen path (the FSM's
+        # reporting phase already wrote one into the run dir; this is the
+        # convenience override). FAILED runs still get a report -- reports
+        # of failures are exactly the ones people need to read.
+        out = Path(args.report) if args.report != "auto" else \
+            result.output_dir / "report.md"
+        path = ReportGenerator().write_run_report(result, out)
+        print(f"  report: {path}")
     if result.error:
         print(f"  ERROR: {result.error}", file=sys.stderr)
         return 1
@@ -185,6 +209,12 @@ def cmd_sweep(args: argparse.Namespace) -> int:
               f"mean={agg['mean_eval_reward']:.2f} "
               f"std_across_seeds={agg['std_across_seeds']:.2f} "
               f"success={agg['success_rate']:.0%}")
+    if getattr(args, "report", False):
+        from rl_lab.reporting.report_generator import ReportGenerator
+        out = Path(args.report) if args.report != "auto" else \
+            Path("runs") / "sweep_report.md"
+        path = ReportGenerator().write_sweep_report(results, out, agg=agg)
+        print(f"sweep report: {path}")
     return 1 if any(r.state.name == "FAILED" for r in results) else 0
 
 
